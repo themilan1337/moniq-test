@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# Moniq CLI Tool Installer
-# curl -sfL https://moniq.sh | BOT_TOKEN="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -
-# curl -sfL https://moniq.sh | BOT_ID="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -  # Legacy support
+# Moniq CLI Installation Script
+# curl -sfL https://get.moniq.sh | BOT_TOKEN="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -
+# curl -sfL https://get.moniq.sh | BOT_ID="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -  # Legacy support
 
 set -e
 
@@ -87,7 +87,7 @@ download_binary() {
     
     # Download binary from server
     print_status "info" "Downloading Moniq CLI..."
-    if curl -sfL "https://moniq.sh/$BINARY_NAME" -o "$CLI_DIR/moniq"; then
+    if curl -sfL "https://get.moniq.sh/$BINARY_NAME" -o "$CLI_DIR/moniq"; then
         chmod +x "$CLI_DIR/moniq"
         print_status "success" "Download completed"
     else

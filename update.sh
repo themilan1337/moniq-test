@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Moniq CLI Update Script
-# curl -sfL https://moniq.sh/update.sh | bash
+# curl -sfL https://get.moniq.sh/update.sh | bash
 
 set -e
 
@@ -63,7 +63,7 @@ print_status() {
 check_installation() {
     if ! command -v moniq &> /dev/null; then
         print_status "error" "Moniq CLI is not installed"
-        print_status "info" "Please install first: curl -sfL https://moniq.sh/install.sh | bash"
+        print_status "info" "Please install first: curl -sfL https://get.moniq.sh/install.sh | bash"
         exit 1
     fi
 }
@@ -123,7 +123,7 @@ download_and_install() {
     trap "rm -rf $TEMP_DIR" EXIT
     
     # Download binary
-    if curl -sfL "https://moniq.sh/$BINARY_NAME" -o "$TEMP_DIR/moniq"; then
+    if curl -sfL "https://get.moniq.sh/$BINARY_NAME" -o "$TEMP_DIR/moniq"; then
         chmod +x "$TEMP_DIR/moniq"
         print_status "success" "Download completed"
     else
