@@ -359,14 +359,34 @@ send_install_stats() {
         -H "X-Version: 1.0.0" \
         -d "$data" 2>/dev/null || echo '{"success":false}')
     
-    # Extract server_token from response if successful
+    # Extract server_token from response if successful (same approach as Go code)
     if [ -n "$response" ]; then
-        # Check if response contains success: true
-        if echo "$response" | grep -q '"success":\s*true'; then
-            # Extract server_token from data.server_token
-            local server_token=$(echo "$response" | grep -o '"server_token":"[^"]*"' | cut -d'"' -f4)
+        # Log full response for debugging
+        log_message "INFO" "Full response received: $response"
+        
+        # Check if response contains success field (same as Go: result["success"] == true)
+        if echo "$response" | grep -q '"success"'; then
+            # Extract server_token from data.server_token (same as Go: data["server_token"])
+            local server_token=""
+            
+            # Method 1: Use jq for proper JSON parsing (same logic as Go)
+            if command -v jq >/dev/null 2>&1; then
+                server_token=$(echo "$response" | jq -r '.data.server_token // empty' 2>/dev/null)
+                if [ -n "$server_token" ]; then
+                    log_message "INFO" "server_token extracted with jq: $server_token"
+                fi
+            fi
+            
+            # Method 2: Fallback to grep if jq not available
+            if [ -z "$server_token" ]; then
+                server_token=$(echo "$response" | grep -o '"server_token":"[^"]*"' | cut -d'"' -f4)
+                if [ -n "$server_token" ]; then
+                    log_message "INFO" "server_token extracted with grep fallback: $server_token"
+                fi
+            fi
+            
             if [ -n "$server_token" ]; then
-                # Save server_token to config
+                # Save server_token to config (same as Go: cfg.ServerToken = serverToken)
                 local config_file="$HOME/.moniq/config.yaml"
                 if [ -f "$config_file" ]; then
                     # Add server_token to config if not already present
@@ -382,10 +402,11 @@ send_install_stats() {
                     log_message "ERROR" "Config file not found: $config_file"
                 fi
             else
-                log_message "WARNING" "server_token not found in response"
+                log_message "WARNING" "server_token not found in response - tried jq and grep methods"
+                log_message "WARNING" "Response structure: $(echo "$response" | head -c 200)..."
             fi
         else
-            log_message "ERROR" "Installation request failed - response: $response"
+            log_message "ERROR" "Installation request failed - no success field in response: $response"
         fi
     else
         log_message "ERROR" "Installation request failed - no response"
