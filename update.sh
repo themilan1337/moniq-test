@@ -89,8 +89,40 @@ check_for_updates() {
     return 0
 }
 
+# Function to kill duplicate processes
+kill_duplicate_processes() {
+    print_status "info" "Checking for duplicate moniq processes..."
+    
+    # Find all moniq daemon processes
+    local pids=$(pgrep -f "moniq daemon" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        local pid_count=$(echo "$pids" | wc -l)
+        if [ "$pid_count" -gt 1 ]; then
+            print_status "warning" "Found $pid_count duplicate moniq daemon processes"
+            
+            # Keep the first process, kill the rest
+            local first_pid=$(echo "$pids" | head -n1)
+            echo "$pids" | tail -n +2 | while read pid; do
+                if [ "$pid" != "$first_pid" ]; then
+                    print_status "info" "Killing duplicate process PID: $pid"
+                    kill "$pid" 2>/dev/null
+                fi
+            done
+            
+            print_status "success" "Duplicate processes killed, keeping PID: $first_pid"
+        else
+            print_status "info" "Only one moniq daemon process running (PID: $(echo $pids))"
+        fi
+    else
+        print_status "info" "No moniq daemon processes found"
+    fi
+}
+
 # Stop moniq service if running
 stop_service() {
+    # Kill any duplicate processes first
+    kill_duplicate_processes
+    
     if pgrep -f "moniq daemon" > /dev/null; then
         print_status "info" "Stopping monitoring service..."
         pkill -f "moniq daemon" || true
@@ -174,6 +206,10 @@ test_installation() {
 # Start service if it was running
 start_service() {
     print_status "info" "Starting monitoring service..."
+    
+    # Kill any duplicate processes before starting
+    kill_duplicate_processes
+    
     if moniq start > /dev/null 2>&1; then
         print_status "success" "Monitoring service started"
     else

@@ -210,6 +210,33 @@ create_systemd_service() {
 	# Create systemd user directory
 	mkdir -p "$HOME/.config/systemd/user"
 	
+	# Create wrapper script for duplicate protection
+	local wrapper_script="$HOME/.moniq/start_moniq.sh"
+	cat > "$wrapper_script" << 'EOF'
+#!/bin/bash
+# Wrapper script to start moniq daemon safely
+CLI_DIR="$HOME/.local/bin"
+
+# Kill any duplicate processes first
+pids=$(pgrep -f "moniq daemon" 2>/dev/null)
+if [ -n "$pids" ]; then
+    pid_count=$(echo "$pids" | wc -l)
+    if [ "$pid_count" -gt 1 ]; then
+        # Keep the first process, kill the rest
+        first_pid=$(echo "$pids" | head -n1)
+        echo "$pids" | tail -n +2 | while read pid; do
+            if [ "$pid" != "$first_pid" ]; then
+                kill "$pid" 2>/dev/null
+            fi
+        done
+    fi
+fi
+
+# Start the daemon
+exec "$CLI_DIR/moniq" daemon
+EOF
+	chmod +x "$wrapper_script"
+	
 	# Create service file
 	cat > "$HOME/.config/systemd/user/moniq.service" << EOF
 [Unit]
@@ -218,7 +245,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$CLI_DIR/moniq daemon
+ExecStart=$wrapper_script
 Restart=always
 RestartSec=10
 Environment=PATH=$CLI_DIR:/usr/local/bin:/usr/bin:/bin
@@ -235,20 +262,27 @@ EOF
 			# Start service immediately if enabled successfully
 			if systemctl --user start moniq.service 2>/dev/null; then
 				print_status "success" "Monitoring service started via systemd"
+				log_message "SUCCESS" "Monitoring service started via systemd"
 			else
 				print_status "warning" "Could not start service via systemd, starting manually..."
+				# Kill any duplicate processes before starting manually
+				kill_duplicate_processes
 				if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
 					print_status "success" "Monitoring service started manually"
+					log_message "SUCCESS" "Monitoring service started manually after systemd failure"
 				fi
 			fi
 		else
 			print_status "warning" "Could not enable systemd service, but service file created"
 			print_status "info" "You can enable it manually with: systemctl --user enable moniq.service"
-			# Start service manually if enable failed
-			print_status "info" "Starting monitoring service manually..."
-			if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
-				print_status "success" "Monitoring service started manually"
-			fi
+					# Start service manually if enable failed
+		print_status "info" "Starting monitoring service manually..."
+		# Kill any duplicate processes before starting manually
+		kill_duplicate_processes
+		if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
+			print_status "success" "Monitoring service started manually"
+			log_message "SUCCESS" "Monitoring service started manually after launchd failure"
+		fi
 		fi
 	else
 		print_status "warning" "Could not reload systemd daemon, but service file created"
@@ -267,6 +301,33 @@ EOF
 create_launchd_service() {
 	print_status "info" "Creating launchd service for autostart..."
 	
+	# Create wrapper script for duplicate protection
+	local wrapper_script="$HOME/.moniq/start_moniq.sh"
+	cat > "$wrapper_script" << 'EOF'
+#!/bin/bash
+# Wrapper script to start moniq daemon safely
+CLI_DIR="$HOME/.local/bin"
+
+# Kill any duplicate processes first
+pids=$(pgrep -f "moniq daemon" 2>/dev/null)
+if [ -n "$pids" ]; then
+    pid_count=$(echo "$pids" | wc -l)
+    if [ "$pid_count" -gt 1 ]; then
+        # Keep the first process, kill the rest
+        first_pid=$(echo "$pids" | head -n1)
+        echo "$pids" | tail -n +2 | while read pid; do
+            if [ "$pid" != "$first_pid" ]; then
+                kill "$pid" 2>/dev/null
+            fi
+        done
+    fi
+fi
+
+# Start the daemon
+exec "$CLI_DIR/moniq" daemon
+EOF
+	chmod +x "$wrapper_script"
+	
 	# Create launchd plist file
 	cat > "$HOME/Library/LaunchAgents/com.moniq.monitor.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -277,8 +338,7 @@ create_launchd_service() {
 	<string>com.moniq.monitor</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>$CLI_DIR/moniq</string>
-		<string>daemon</string>
+		<string>$wrapper_script</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
@@ -309,12 +369,94 @@ create_crontab_service() {
 	
 	# Add to crontab if not already present
 	if ! crontab -l 2>/dev/null | grep -q "moniq daemon"; then
-		(crontab -l 2>/dev/null; echo "@reboot $CLI_DIR/moniq daemon > /dev/null 2>&1 &") | crontab -
-		print_status "success" "Crontab entry created for autostart"
-		print_status "info" "Service will start automatically on boot"
+		# Use a wrapper script that kills duplicates before starting
+		local wrapper_script="$HOME/.moniq/start_moniq.sh"
+		cat > "$wrapper_script" << 'EOF'
+#!/bin/bash
+# Wrapper script to start moniq daemon safely
+CLI_DIR="$HOME/.local/bin"
+
+# Kill any duplicate processes first
+pids=$(pgrep -f "moniq daemon" 2>/dev/null)
+if [ -n "$pids" ]; then
+    pid_count=$(echo "$pids" | wc -l)
+    if [ "$pid_count" -gt 1 ]; then
+        # Keep the first process, kill the rest
+        first_pid=$(echo "$pids" | head -n1)
+        echo "$pids" | tail -n +2 | while read pid; do
+            if [ "$pid" != "$first_pid" ]; then
+                kill "$pid" 2>/dev/null
+            fi
+        done
+    fi
+fi
+
+# Start the daemon
+exec "$CLI_DIR/moniq" daemon
+EOF
+		chmod +x "$wrapper_script"
+		
+		(crontab -l 2>/dev/null; echo "@reboot $wrapper_script > /dev/null 2>&1 &") | crontab -
+		print_status "success" "Crontab entry created for autostart with duplicate protection"
+		print_status "info" "Service will start automatically on boot with duplicate process protection"
 	else
 		print_status "info" "Crontab entry already exists"
 	fi
+}
+
+# Function to kill duplicate processes
+kill_duplicate_processes() {
+    log_message "INFO" "Checking for duplicate moniq processes..."
+    
+    # Find all moniq daemon processes
+    local pids=$(pgrep -f "moniq daemon" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        local pid_count=$(echo "$pids" | wc -l)
+        if [ "$pid_count" -gt 1 ]; then
+            log_message "WARNING" "Found $pid_count duplicate moniq daemon processes"
+            
+            # Keep the first process, kill the rest
+            local first_pid=$(echo "$pids" | head -n1)
+            echo "$pids" | tail -n +2 | while read pid; do
+                if [ "$pid" != "$first_pid" ]; then
+                    log_message "INFO" "Killing duplicate process PID: $pid"
+                    kill "$pid" 2>/dev/null
+                fi
+            done
+            
+            log_message "SUCCESS" "Duplicate processes killed, keeping PID: $first_pid"
+        else
+            log_message "INFO" "Only one moniq daemon process running (PID: $(echo $pids))"
+        fi
+    else
+        log_message "INFO" "No moniq daemon processes found"
+    fi
+}
+
+# Function to start monitoring service safely
+auto_start() {
+    print_status "info" "Starting monitoring service..."
+    
+    # Kill any duplicate processes first
+    kill_duplicate_processes
+    
+    # Check if service is already running
+    if pgrep -f "moniq daemon" >/dev/null; then
+        print_status "warning" "Monitoring service is already running"
+        return 0
+    fi
+    
+    # Start the service
+    if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
+        local start_pid=$!
+        print_status "success" "Monitoring service started successfully (PID: $start_pid)"
+        log_message "SUCCESS" "Monitoring service started via auto_start (PID: $start_pid)"
+        return 0
+    else
+        print_status "error" "Failed to start monitoring service"
+        log_message "ERROR" "Failed to start monitoring service via auto_start"
+        return 1
+    fi
 }
 
 # Send installation statistics
