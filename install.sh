@@ -30,7 +30,7 @@ print_header() {
     printf "${CYAN}██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║╚██████╔╝██╗███████║██║  ██║${NC}\n"
     printf "${CYAN}╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝ ╚══▀▀═╝ ╚═╝╚══════╝╚═╝ ╚═╝${NC}\n"
     printf "\n"
-    printf "                    ${WHITE}Professional Edition${NC}\n"
+    printf "                    ${WHITE}Server Monitor${NC}\n"
     printf "\n"
 }
 
