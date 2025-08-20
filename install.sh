@@ -64,6 +64,14 @@ print_status() {
     esac
 }
 
+# Log message to /tmp/moniq.log
+log_message() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $level: $message" >> /tmp/moniq.log
+}
+
 create_directories() {
     mkdir -p "$HOME/.local/bin"
     mkdir -p "$HOME/.moniq"
@@ -85,13 +93,18 @@ download_binary() {
     
     BINARY_NAME="moniq-$OS-$ARCH"
     
+    # Log download start
+    log_message "INFO" "Download started - Binary: $BINARY_NAME, URL: https://get.moniq.sh/$BINARY_NAME"
+    
     # Download binary from server
     print_status "info" "Downloading Moniq CLI..."
     if curl -sfL "https://get.moniq.sh/$BINARY_NAME" -o "$CLI_DIR/moniq"; then
         chmod +x "$CLI_DIR/moniq"
         print_status "success" "Download completed"
+        log_message "INFO" "Download completed successfully - Binary: $BINARY_NAME"
     else
         print_status "error" "Download failed"
+        log_message "ERROR" "Download failed - Binary: $BINARY_NAME"
         exit 1
     fi
 }
@@ -335,6 +348,9 @@ send_install_stats() {
     
     data="${data}}"
     
+    # Log installation request start
+    log_message "INFO" "Installation request started - URL: https://api.moniq.sh/api/downloads/install"
+    
     # Send stats and get response
     local response=$(curl -s -X POST "https://api.moniq.sh/api/downloads/install" \
         -H "Content-Type: application/json" \
@@ -356,17 +372,30 @@ send_install_stats() {
                     # Add server_token to config if not already present
                     if ! grep -q "server_token:" "$config_file"; then
                         echo "server_token: $server_token" >> "$config_file"
+                        log_message "INFO" "server_token added to config: $server_token"
                     else
                         # Update existing server_token
                         sed -i.bak "s/server_token:.*/server_token: $server_token/" "$config_file"
+                        log_message "INFO" "server_token updated in config: $server_token"
                     fi
+                else
+                    log_message "ERROR" "Config file not found: $config_file"
                 fi
+            else
+                log_message "WARNING" "server_token not found in response"
             fi
+        else
+            log_message "ERROR" "Installation request failed - response: $response"
         fi
+    else
+        log_message "ERROR" "Installation request failed - no response"
     fi
 }
 
 main() {
+    # Log installation start
+    log_message "INFO" "Installation script started"
+    
     print_header
     
     print_section "Installing Moniq CLI"
@@ -385,6 +414,9 @@ main() {
     
     # Send installation statistics
     send_install_stats
+    
+    # Log installation completion
+    log_message "INFO" "Installation completed successfully"
     
     print_section_end
 }
