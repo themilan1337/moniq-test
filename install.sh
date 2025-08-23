@@ -578,6 +578,10 @@ main() {
     # Send installation statistics
     send_install_stats
     
+    # Final check for duplicate processes after installation
+    print_status "info" "Performing final duplicate process check..."
+    kill_duplicate_processes
+    
     # Log installation completion
     log_message "INFO" "Installation completed successfully"
     
