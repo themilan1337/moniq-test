@@ -459,6 +459,47 @@ auto_start() {
     fi
 }
 
+# Function to get CPU cores
+get_cpu_cores() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        sysctl -n hw.ncpu 2>/dev/null || echo "0"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+# Function to get total memory in GB
+get_total_memory() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        local memory_bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
+        echo $((memory_bytes / 1024 / 1024 / 1024))
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        local memory_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+        echo $((memory_kb / 1024 / 1024))
+    else
+        echo "0"
+    fi
+}
+
+# Function to get total storage in GB
+get_total_storage() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        df -g / | tail -1 | awk '{print $2}' 2>/dev/null || echo "0"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        df -BG / | tail -1 | awk '{print $2}' | sed 's/G//' 2>/dev/null || echo "0"
+    else
+        echo "0"
+    fi
+}
+
 # Send installation statistics
 send_install_stats() {
     local platform=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -468,6 +509,14 @@ send_install_stats() {
         "aarch64") arch="arm64" ;;
         "arm64") arch="arm64" ;;
     esac
+    
+    # Get server specifications
+    local cpu_cores=$(get_cpu_cores)
+    local total_memory=$(get_total_memory)
+    local total_storage=$(get_total_storage)
+    
+    # Log server specs for debugging
+    log_message "DEBUG" "Server specs - CPU: ${cpu_cores} cores, Memory: ${total_memory} GB, Storage: ${total_storage} GB"
     
     # Подготавливаем данные для отправки
     local data="{\"platform\":\"$platform\",\"architecture\":\"$arch\",\"type\":\"install\",\"timestamp\":\"$(date +%s)\""
@@ -485,10 +534,16 @@ send_install_stats() {
             fi
             
             data="${data},\"user_token\":\"$escaped_token\",\"server_info\":{\"hostname\":\"$hostname\",\"os_type\":\"$platform\",\"moniq_version\":\"$moniq_version\"}"
+            
+            # Add server specifications
+            data="${data},\"cpu_cores\":$cpu_cores,\"total_memory\":$total_memory,\"total_storage\":$total_storage"
         fi
     fi
     
     data="${data}}"
+    
+    # Log the JSON data being sent for debugging
+    log_message "DEBUG" "Sending JSON data: $data"
     
     # Log installation request start
     log_message "INFO" "Installation request started - URL: https://api.moniq.sh/api/downloads/install"

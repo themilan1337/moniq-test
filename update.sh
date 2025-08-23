@@ -218,6 +218,47 @@ start_service() {
     fi
 }
 
+# Function to get CPU cores
+get_cpu_cores() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        sysctl -n hw.ncpu 2>/dev/null || echo "0"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+# Function to get total memory in GB
+get_total_memory() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        local memory_bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
+        echo $((memory_bytes / 1024 / 1024 / 1024))
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        local memory_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+        echo $((memory_kb / 1024 / 1024))
+    else
+        echo "0"
+    fi
+}
+
+# Function to get total storage in GB
+get_total_storage() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # macOS
+        df -g / | tail -1 | awk '{print $2}' 2>/dev/null || echo "0"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # Linux
+        df -BG / | tail -1 | awk '{print $2}' | sed 's/G//' 2>/dev/null || echo "0"
+    else
+        echo "0"
+    fi
+}
+
 # Send update statistics
 send_update_stats() {
     local platform=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -228,13 +269,27 @@ send_update_stats() {
         "arm64") arch="arm64" ;;
     esac
 
+    # Get server specifications
+    local cpu_cores=$(get_cpu_cores)
+    local total_memory=$(get_total_memory)
+    local total_storage=$(get_total_storage)
+    
+    # Log server specs for debugging
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Update - Server specs - CPU: ${cpu_cores} cores, Memory: ${total_memory} GB, Storage: ${total_storage} GB" >> /tmp/moniq.log 2>/dev/null || true
+    
+    # Prepare JSON data with server specifications
+    local json_data="{\"platform\":\"$platform\",\"architecture\":\"$arch\",\"type\":\"update\",\"timestamp\":\"$(date +%s)\",\"cpu_cores\":$cpu_cores,\"total_memory\":$total_memory,\"total_storage\":$total_storage}"
+    
+    # Log the JSON data being sent for debugging
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Update - Sending JSON data: $json_data" >> /tmp/moniq.log 2>/dev/null || true
+
     # Send stats silently (don't interrupt update)
     curl -s -X POST "https://api.moniq.sh/api/downloads/install" \
         -H "Content-Type: application/json" \
         -H "User-Agent: Moniq-CLI/1.0.0" \
         -H "X-Platform: $platform" \
         -H "X-Version: 1.0.0" \
-        -d "{\"platform\":\"$platform\",\"architecture\":\"$arch\",\"type\":\"update\",\"timestamp\":\"$(date +%s)\"}" \
+        -d "$json_data" \
         >/dev/null 2>&1 || true
 }
 
