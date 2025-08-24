@@ -174,9 +174,40 @@ disk_threshold: 90.0
 
 test_installation() {
     CLI_DIR="$HOME/.local/bin"
-    # Test the binary directly
-    if ! "$CLI_DIR/moniq" --help >/dev/null 2>&1; then
-        print_status "error" "Installation failed"
+    MONIQ_BINARY="$CLI_DIR/moniq"
+    
+    # Log test start
+    log_message "INFO" "Testing installation - Binary: $MONIQ_BINARY"
+    
+    # Check if binary exists
+    if [ ! -f "$MONIQ_BINARY" ]; then
+        log_message "ERROR" "Binary not found: $MONIQ_BINARY"
+        print_status "error" "Binary not found: $MONIQ_BINARY"
+        exit 1
+    fi
+    
+    # Check binary permissions
+    if [ ! -x "$MONIQ_BINARY" ]; then
+        log_message "ERROR" "Binary not executable: $MONIQ_BINARY"
+        print_status "error" "Binary not executable: $MONIQ_BINARY"
+        exit 1
+    fi
+    
+    # Log binary info
+    log_message "INFO" "Binary exists and is executable"
+    log_message "INFO" "Binary size: $(ls -lh "$MONIQ_BINARY" | awk '{print $5}')"
+    log_message "INFO" "Binary permissions: $(ls -la "$MONIQ_BINARY" | awk '{print $1}')"
+    
+    # Test the binary with more detailed logging
+    log_message "INFO" "Testing binary with --help flag..."
+    if "$MONIQ_BINARY" --help >/dev/null 2>&1; then
+        log_message "SUCCESS" "Binary test passed - --help flag works"
+        print_status "success" "Installation test passed"
+    else
+        local exit_code=$?
+        log_message "ERROR" "Binary test failed with exit code: $exit_code"
+        log_message "ERROR" "Binary output: $("$MONIQ_BINARY" --help 2>&1)"
+        print_status "error" "Installation failed - binary test failed"
         exit 1
     fi
 }
