@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Moniq CLI Update Script
+# Moniq.sh Update Script
 # curl -sfL https://get.moniq.sh/update.sh | bash
 
 set -e
@@ -62,7 +62,7 @@ print_status() {
 # Check if moniq is installed
 check_installation() {
     if ! command -v moniq &> /dev/null; then
-        print_status "error" "Moniq CLI is not installed"
+        print_status "error" "Moniq.sh is not installed"
         print_status "info" "Please install first: curl -sfL https://get.moniq.sh/install.sh | bash"
         exit 1
     fi
@@ -272,7 +272,7 @@ send_update_stats() {
 main() {
     print_header
     
-    print_section "Updating Moniq CLI"
+    print_section "Updating Moniq.sh"
     
     check_installation
     check_for_updates
@@ -292,7 +292,7 @@ main() {
     print_section_end
     
     print_section "Update Complete"
-    print_status "success" "Moniq CLI updated successfully"
+    print_status "success" "Moniq.sh updated successfully"
     print_status "info" "Run 'moniq status' to check your system"
     print_status "info" "Run 'moniq --help' to see all commands"
     

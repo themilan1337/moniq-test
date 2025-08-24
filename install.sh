@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Moniq CLI Installation Script
+# Moniq.sh Installation Script
 # curl -sfL https://get.moniq.sh | BOT_TOKEN="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -
 # curl -sfL https://get.moniq.sh | BOT_ID="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" GROUP_ID="123456789" sh -  # Legacy support
 
@@ -97,7 +97,7 @@ download_binary() {
     log_message "INFO" "Download started - Binary: $BINARY_NAME, URL: https://get.moniq.sh/$BINARY_NAME"
     
     # Download binary from server
-    print_status "info" "Downloading Moniq CLI..."
+    print_status "info" "Downloading Moniq.sh..."
     if curl -sfL "https://get.moniq.sh/$BINARY_NAME" -o "$CLI_DIR/moniq"; then
         chmod +x "$CLI_DIR/moniq"
         print_status "success" "Download completed"
@@ -624,7 +624,7 @@ main() {
     
     print_header
     
-    print_section "Installing Moniq CLI"
+    print_section "Installing Moniq.sh"
     create_directories
     download_binary
     add_to_path
@@ -639,7 +639,7 @@ main() {
     print_section_end
     
     print_section "Installation Complete"
-    print_status "success" "Moniq CLI installed successfully"
+    print_status "success" "Moniq.sh installed successfully"
     print_status "info" "Run 'moniq status' to check your system"
     print_status "info" "Run 'moniq --help' to see all commands"
     
