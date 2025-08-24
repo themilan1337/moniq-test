@@ -91,30 +91,19 @@ check_for_updates() {
 
 # Function to kill duplicate processes
 kill_duplicate_processes() {
-    print_status "info" "Checking for duplicate moniq processes..."
-    
     # Find all moniq daemon processes
     local pids=$(pgrep -f "moniq daemon" 2>/dev/null)
     if [ -n "$pids" ]; then
         local pid_count=$(echo "$pids" | wc -l)
         if [ "$pid_count" -gt 1 ]; then
-            print_status "warning" "Found $pid_count duplicate moniq daemon processes"
-            
             # Keep the first process, kill the rest
             local first_pid=$(echo "$pids" | head -n1)
             echo "$pids" | tail -n +2 | while read pid; do
                 if [ "$pid" != "$first_pid" ]; then
-                    print_status "info" "Killing duplicate process PID: $pid"
                     kill "$pid" 2>/dev/null
                 fi
             done
-            
-            print_status "success" "Duplicate processes killed, keeping PID: $first_pid"
-        else
-            print_status "info" "Only one moniq daemon process running (PID: $(echo $pids))"
         fi
-    else
-        print_status "info" "No moniq daemon processes found"
     fi
 }
 
@@ -124,7 +113,6 @@ stop_service() {
     kill_duplicate_processes
     
     if pgrep -f "moniq daemon" > /dev/null; then
-        print_status "info" "Stopping monitoring service..."
         pkill -f "moniq daemon" || true
         sleep 2
     fi
@@ -143,7 +131,6 @@ get_system_info() {
     esac
     
     BINARY_NAME="moniq-$OS-$ARCH"
-    print_status "info" "System: $OS-$ARCH"
 }
 
 # Download and install new version
@@ -169,7 +156,6 @@ download_and_install() {
     # Backup old version
     if [ -f "$CURRENT_MONIQ" ]; then
         cp "$CURRENT_MONIQ" "$CURRENT_MONIQ.backup"
-        print_status "info" "Backup created: $CURRENT_MONIQ.backup"
     fi
     
     # Install new version
@@ -205,16 +191,11 @@ test_installation() {
 
 # Start service if it was running
 start_service() {
-    print_status "info" "Starting monitoring service..."
-    
     # Kill any duplicate processes before starting
     kill_duplicate_processes
     
     if moniq start > /dev/null 2>&1; then
         print_status "success" "Monitoring service started"
-    else
-        print_status "warning" "Could not start monitoring service automatically"
-        print_status "info" "Run 'moniq start' to start monitoring manually"
     fi
 }
 
@@ -274,14 +255,8 @@ send_update_stats() {
     local total_memory=$(get_total_memory)
     local total_storage=$(get_total_storage)
     
-    # Log server specs for debugging
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Update - Server specs - CPU: ${cpu_cores} cores, Memory: ${total_memory} GB, Storage: ${total_storage} GB" >> /tmp/moniq.log 2>/dev/null || true
-    
     # Prepare JSON data with server specifications
     local json_data="{\"platform\":\"$platform\",\"architecture\":\"$arch\",\"type\":\"update\",\"timestamp\":\"$(date +%s)\",\"cpu_cores\":$cpu_cores,\"total_memory\":$total_memory,\"total_storage\":$total_storage}"
-    
-    # Log the JSON data being sent for debugging
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Update - Sending JSON data: $json_data" >> /tmp/moniq.log 2>/dev/null || true
 
     # Send stats silently (don't interrupt update)
     curl -s -X POST "https://api.moniq.sh/api/downloads/install" \

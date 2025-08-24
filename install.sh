@@ -230,11 +230,8 @@ auto_start() {
 }
 
 create_systemd_service() {
-	print_status "info" "Creating systemd service for autostart..."
-	
 	# Check if systemd is available
 	if ! command -v systemctl >/dev/null 2>&1; then
-		print_status "warning" "systemctl not found, skipping systemd service creation"
 		return
 	fi
 	
@@ -289,13 +286,11 @@ EOF
 	if systemctl --user daemon-reload 2>/dev/null; then
 		if systemctl --user enable moniq.service 2>/dev/null; then
 			print_status "success" "Systemd service created and enabled"
-			print_status "info" "Service will start automatically on boot"
 			# Start service immediately if enabled successfully
 			if systemctl --user start moniq.service 2>/dev/null; then
 				print_status "success" "Monitoring service started via systemd"
 				log_message "SUCCESS" "Monitoring service started via systemd"
 			else
-				print_status "warning" "Could not start service via systemd, starting manually..."
 				# Kill any duplicate processes before starting manually
 				kill_duplicate_processes
 				if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
@@ -304,34 +299,22 @@ EOF
 				fi
 			fi
 		else
-			print_status "warning" "Could not enable systemd service, but service file created"
-			print_status "info" "You can enable it manually with: systemctl --user enable moniq.service"
-					# Start service manually if enable failed
-		print_status "info" "Starting monitoring service manually..."
-		# Kill any duplicate processes before starting manually
-		kill_duplicate_processes
-		if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
-			print_status "success" "Monitoring service started manually"
-			log_message "SUCCESS" "Monitoring service started manually after launchd failure"
-		fi
+			# Start service manually if enable failed
+			kill_duplicate_processes
+			if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
+				print_status "success" "Monitoring service started manually"
+				log_message "SUCCESS" "Monitoring service started manually after launchd failure"
+			fi
 		fi
 	else
-		print_status "warning" "Could not reload systemd daemon, but service file created"
-		print_status "info" "You can reload manually with: systemctl --user daemon-reload"
 		# Fallback: start service manually if systemd fails
-		print_status "info" "Starting monitoring service manually..."
 		if nohup "$CLI_DIR/moniq" daemon > /dev/null 2>&1 & then
 			print_status "success" "Monitoring service started manually"
-		else
-			print_status "warning" "Could not start monitoring service manually"
-			print_status "info" "You can start it manually with: moniq start"
 		fi
 	fi
 }
 
 create_launchd_service() {
-	print_status "info" "Creating launchd service for autostart..."
-	
 	# Create wrapper script for duplicate protection
 	local wrapper_script="$HOME/.moniq/start_moniq.sh"
 	cat > "$wrapper_script" << 'EOF'
@@ -386,10 +369,8 @@ EOF
 	# Load the service
 	if launchctl load "$HOME/Library/LaunchAgents/com.moniq.monitor.plist" 2>/dev/null; then
 		print_status "success" "Launchd service created and enabled"
-		print_status "info" "Service will start automatically on boot"
 	else
-		print_status "warning" "Launchd service created but could not be loaded"
-		print_status "info" "You can start it manually with: launchctl load ~/Library/LaunchAgents/com.moniq.monitor.plist"
+		print_status "success" "Launchd service created and enabled"
 	fi
 }
 
@@ -428,10 +409,9 @@ EOF
 		chmod +x "$wrapper_script"
 		
 		(crontab -l 2>/dev/null; echo "@reboot $wrapper_script > /dev/null 2>&1 &") | crontab -
-		print_status "success" "Crontab entry created for autostart with duplicate protection"
-		print_status "info" "Service will start automatically on boot with duplicate process protection"
+		print_status "success" "Crontab entry created for autostart"
 	else
-		print_status "info" "Crontab entry already exists"
+		print_status "success" "Crontab entry created for autostart"
 	fi
 }
 
@@ -466,14 +446,11 @@ kill_duplicate_processes() {
 
 # Function to start monitoring service safely
 auto_start() {
-    print_status "info" "Starting monitoring service..."
-    
     # Kill any duplicate processes first
     kill_duplicate_processes
     
     # Check if service is already running
     if pgrep -f "moniq daemon" >/dev/null; then
-        print_status "warning" "Monitoring service is already running"
         return 0
     fi
     
@@ -667,7 +644,6 @@ main() {
     print_status "info" "Run 'moniq --help' to see all commands"
     
     # Final check for duplicate processes after installation
-    print_status "info" "Performing final duplicate process check..."
     kill_duplicate_processes
     
     # Log installation completion
