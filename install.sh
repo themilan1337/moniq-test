@@ -653,6 +653,11 @@ main() {
     add_to_path
     auto_configure
     test_installation
+    
+    # Send installation statistics FIRST to get server_token
+    send_install_stats
+    
+    # Start service AFTER getting server_token
     auto_start
     print_section_end
     
@@ -660,9 +665,6 @@ main() {
     print_status "success" "Moniq CLI installed successfully"
     print_status "info" "Run 'moniq status' to check your system"
     print_status "info" "Run 'moniq --help' to see all commands"
-    
-    # Send installation statistics
-    send_install_stats
     
     # Final check for duplicate processes after installation
     print_status "info" "Performing final duplicate process check..."
